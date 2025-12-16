@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智能股票分析系統 - Stock Prediction</title>
+    <meta name="description" content="專業的股票買賣價格分析工具，根據持有期間提供精準的買入賣出建議">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+TC:wght@300;400;500;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="background-gradient"></div>
+
+    <div class="container">
+        <header class="header">
+            <div class="logo">
+                <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="40" height="40" rx="8" fill="url(#gradient)" />
+                    <path d="M10 25L15 15L20 20L25 12L30 18" stroke="white" stroke-width="2.5" stroke-linecap="round"
+                        stroke-linejoin="round" />
+                    <defs>
+                        <linearGradient id="gradient" x1="0" y1="0" x2="40" y2="40">
+                            <stop offset="0%" stop-color="#667eea" />
+                            <stop offset="100%" stop-color="#764ba2" />
+                        </linearGradient>
+                    </defs>
+                </svg>
+                <h1>智能股票分析</h1>
+            </div>
+            <p class="subtitle">AI-Powered Stock Price Prediction</p>
+        </header>
+
+        <main class="main-content">
+            <div class="input-card glass-card">
+                <h2>輸入股票資訊</h2>
+                <form id="stockForm">
+                    <div class="form-group">
+                        <label for="stockTicker">股票代號</label>
+                        <div class="input-wrapper">
+                            <input type="text" id="stockTicker" placeholder="例如: AAPL, TSLA, 2330.TW" required
+                                autocomplete="off">
+                            <span class="input-icon">📊</span>
+                        </div>
+                        <small class="input-hint">請輸入有效的股票代碼</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="holdingPeriod">預期持有期間</label>
+                        <div class="select-wrapper">
+                            <select id="holdingPeriod" required>
+                                <option value="">請選擇持有期間</option>
+                                <option value="short">短期 (1-7天)</option>
+                                <option value="medium">中期 (1-3個月)</option>
+                                <option value="long">長期 (6個月以上)</option>
+                            </select>
+                            <span class="select-icon">⏱️</span>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="submit-btn" id="analyzeBtn">
+                        <span class="btn-text">開始分析</span>
+                        <span class="btn-icon">→</span>
+                    </button>
+                </form>
+            </div>
+
+            <div class="results-section" id="resultsSection">
+                <div class="loading" id="loading">
+                    <div class="spinner"></div>
+                    <p>正在分析股票數據...</p>
+                </div>
+
+                <div class="results-content" id="resultsContent">
+                    <div class="result-header">
+                        <h2 id="resultStockName">分析結果</h2>
+                        <span class="result-badge" id="resultBadge"></span>
+                    </div>
+
+                    <!-- Buy/Sell Recommendation Cards -->
+                    <div class="price-cards">
+                        <div class="price-card glass-card buy-card">
+                            <div class="card-icon">📈</div>
+                            <h3>建議買入價格</h3>
+                            <div class="price-value" id="buyPrice">$0.00</div>
+                            <div class="price-range">
+                                <span class="range-label">價格區間</span>
+                                <span class="range-value" id="buyRange">$0.00 - $0.00</span>
+                            </div>
+                            <div class="confidence-bar">
+                                <div class="confidence-fill buy-confidence" id="buyConfidence"></div>
+                            </div>
+                            <p class="confidence-text" id="buyConfidenceText">信心指數: 0%</p>
+                        </div>
+
+                        <div class="price-card glass-card sell-card">
+                            <div class="card-icon">📉</div>
+                            <h3>建議賣出價格</h3>
+                            <div class="price-value" id="sellPrice">$0.00</div>
+                            <div class="price-range">
+                                <span class="range-label">價格區間</span>
+                                <span class="range-value" id="sellRange">$0.00 - $0.00</span>
+                            </div>
+                            <div class="confidence-bar">
+                                <div class="confidence-fill sell-confidence" id="sellConfidence"></div>
+                            </div>
+                            <p class="confidence-text" id="sellConfidenceText">信心指數: 0%</p>
+                        </div>
+                    </div>
+
+                    <!-- Timing Recommendation Section -->
+                    <div class="analysis-section glass-card">
+                        <h3>買賣時機建議</h3>
+                        <div class="timing-grid">
+                            <div class="timing-main">
+                                <div class="signal-meter">
+                                    <div class="meter-arrow" id="signalArrow"></div>
+                                    <div class="meter-labels">
+                                        <span>強力賣出</span>
+                                        <span>賣出</span>
+                                        <span>持有</span>
+                                        <span>買入</span>
+                                        <span>強力買入</span>
+                                    </div>
+                                </div>
+                                <div class="signal-text" id="overallSignal">分析中...</div>
+                            </div>
+                            <div class="timing-details">
+                                <div class="timing-item">
+                                    <span class="label">建議進場點</span>
+                                    <span class="value" id="entryPoint">-</span>
+                                </div>
+                                <div class="timing-item">
+                                    <span class="label">建議出場點</span>
+                                    <span class="value" id="exitPoint">-</span>
+                                </div>
+                                <div class="timing-item">
+                                    <span class="label">停損點</span>
+                                    <span class="value" id="stopLoss">-</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Technical Analysis Section -->
+                    <div class="analysis-section glass-card">
+                        <h3>技術線圖分析</h3>
+                        <div class="chart-container">
+                            <canvas id="technicalChart"></canvas>
+                        </div>
+                        <div class="indicators-grid">
+                            <div class="indicator-card">
+                                <h4>RSI (14)</h4>
+                                <div class="indicator-value" id="rsiValue">-</div>
+                                <div class="indicator-status" id="rsiStatus">-</div>
+                            </div>
+                            <div class="indicator-card">
+                                <h4>MACD</h4>
+                                <div class="indicator-value" id="macdValue">-</div>
+                                <div class="indicator-status" id="macdStatus">-</div>
+                            </div>
+                            <div class="indicator-card">
+                                <h4>KD (9,3,3)</h4>
+                                <div class="indicator-value" id="kdValue">-</div>
+                                <div class="indicator-status" id="kdStatus">-</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Revenue Analysis Section -->
+                    <div class="analysis-section glass-card">
+                        <h3>營收分析</h3>
+                        <div class="chart-container">
+                            <canvas id="revenueChart"></canvas>
+                        </div>
+                        <div class="revenue-stats">
+                            <div class="stat-item">
+                                <span class="label">月營收年增率 (YoY)</span>
+                                <span class="value" id="revenueYoy">-</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="label">月營收月增率 (MoM)</span>
+                                <span class="value" id="revenueMom">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Chip Analysis Section -->
+                    <div class="analysis-section glass-card">
+                        <h3>籌碼分析</h3>
+                        <div class="chart-container">
+                            <canvas id="chipChart"></canvas>
+                        </div>
+                        <div class="chip-stats">
+                            <div class="stat-item">
+                                <span class="label">外資買賣超</span>
+                                <span class="value" id="foreignBuySell">-</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="label">投信買賣超</span>
+                                <span class="value" id="trustBuySell">-</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="label">自營商買賣超</span>
+                                <span class="value" id="dealerBuySell">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="analysis-details glass-card">
+                        <h3>詳細數據</h3>
+                        <div class="details-grid">
+                            <div class="detail-item">
+                                <span class="detail-label">當前價格</span>
+                                <span class="detail-value" id="currentPrice">$0.00</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">預期報酬率</span>
+                                <span class="detail-value" id="expectedReturn">0%</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">風險等級</span>
+                                <span class="detail-value" id="riskLevel">-</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">持有期間</span>
+                                <span class="detail-value" id="holdingPeriodDisplay">-</span>
+                            </div>
+                        </div>
+                        <div class="analysis-note">
+                            <p id="analysisNote">📝 此分析基於技術指標和市場趨勢，僅供參考，投資有風險，請謹慎決策。</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Chart.js Library -->
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+        <footer class="footer">
+            <p>© 2025 智能股票分析系統 | 數據僅供參考，不構成投資建議</p>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
