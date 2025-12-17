@@ -210,6 +210,48 @@ body {
     color: var(--text-muted);
 }
 
+/* Custom Period Inputs */
+.custom-period-wrapper {
+    display: flex;
+    gap: var(--spacing-sm);
+}
+
+.period-input {
+    flex: 1;
+}
+
+.period-unit {
+    flex: 1;
+}
+
+/* Update Info */
+.update-info {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: var(--spacing-xs);
+    padding: 0.5rem;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: var(--radius-sm);
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.refresh-btn {
+    background: none;
+    border: none;
+    color: var(--accent-blue);
+    cursor: pointer;
+    font-size: 1.2rem;
+    padding: 0 0.5rem;
+    transition: transform var(--transition-normal);
+}
+
+.refresh-btn:hover {
+    transform: rotate(180deg);
+    color: var(--accent-green);
+}
+
 /* ==================== Submit Button ==================== */
 .submit-btn {
     width: 100%;
@@ -362,6 +404,25 @@ body {
             var(--accent-green));
     border-radius: 20px;
     margin-bottom: var(--spacing-sm);
+    cursor: pointer;
+    /* Interactive */
+}
+
+/* Interactive Signal Segments */
+.signal-meter::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0);
+    transition: background 0.3s ease;
+}
+
+.signal-meter:hover::after {
+    background: rgba(255, 255, 255, 0.1);
 }
 
 .meter-arrow {
@@ -374,7 +435,8 @@ body {
     border-right: 10px solid transparent;
     border-top: 15px solid white;
     transform: translateX(-50%);
-    transition: left 1s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: left 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 2;
 }
 
 .meter-labels {
@@ -383,6 +445,19 @@ body {
     font-size: 0.8rem;
     color: var(--text-muted);
     margin-top: 5px;
+    position: relative;
+}
+
+.meter-labels span {
+    cursor: pointer;
+    padding: 2px 5px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.meter-labels span:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.1);
 }
 
 .signal-text {
@@ -731,5 +806,9 @@ body {
 
     .indicators-grid {
         grid-template-columns: 1fr;
+    }
+
+    .custom-period-wrapper {
+        flex-direction: column;
     }
 }

@@ -47,19 +47,27 @@
                                 autocomplete="off">
                             <span class="input-icon">📊</span>
                         </div>
+                        <div class="update-info" id="updateInfo" style="display: none;">
+                            <span class="update-time">最後更新: <span id="lastUpdateTime">-</span></span>
+                            <button type="button" class="refresh-btn" id="refreshBtn" title="更新報價">↻</button>
+                        </div>
                         <small class="input-hint">請輸入有效的股票代碼</small>
                     </div>
 
                     <div class="form-group">
-                        <label for="holdingPeriod">預期持有期間</label>
-                        <div class="select-wrapper">
-                            <select id="holdingPeriod" required>
-                                <option value="">請選擇持有期間</option>
-                                <option value="short">短期 (1-7天)</option>
-                                <option value="medium">中期 (1-3個月)</option>
-                                <option value="long">長期 (6個月以上)</option>
-                            </select>
-                            <span class="select-icon">⏱️</span>
+                        <label>預期持有期間</label>
+                        <div class="custom-period-wrapper">
+                            <div class="input-wrapper period-input">
+                                <input type="number" id="periodValue" min="1" value="1" required>
+                            </div>
+                            <div class="select-wrapper period-unit">
+                                <select id="periodUnit">
+                                    <option value="days">天</option>
+                                    <option value="weeks">週</option>
+                                    <option value="months" selected>月</option>
+                                </select>
+                                <span class="select-icon">⏱️</span>
+                            </div>
                         </div>
                     </div>
 

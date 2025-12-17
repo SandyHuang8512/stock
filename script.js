@@ -6,269 +6,185 @@ class StockPredictor {
         this.resultsSection = document.getElementById('resultsSection');
         this.loading = document.getElementById('loading');
         this.resultsContent = document.getElementById('resultsContent');
+        this.refreshBtn = document.getElementById('refreshBtn');
 
         // Chart instances
         this.technicalChart = null;
         this.revenueChart = null;
         this.chipChart = null;
 
+        // State
+        this.currentPrediction = null;
+        this.selectedSignal = null;
+
         this.init();
     }
 
     init() {
         this.form.addEventListener('submit', (e) => this.handleSubmit(e));
+        this.refreshBtn.addEventListener('click', () => this.handleRefresh());
 
-        // Set Chart.js defaults
+        this.setupSignalInteractivity();
+
         Chart.defaults.color = '#b4b4c8';
         Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.1)';
     }
 
+    setupSignalInteractivity() {
+        const labels = document.querySelectorAll('.meter-labels span');
+        const signals = ['強力賣出', '賣出', '持有', '買入', '強力買入'];
+
+        labels.forEach((label, index) => {
+            label.addEventListener('click', () => {
+                if (!this.currentPrediction) return;
+
+                this.selectedSignal = signals[index];
+                this.updateTimingDisplay(this.selectedSignal, index * 25);
+                this.recalculateTradePlan(this.selectedSignal);
+            });
+        });
+    }
+
     async handleSubmit(e) {
         e.preventDefault();
+        await this.runAnalysis();
+    }
 
-        const stockTicker = document.getElementById('stockTicker').value.trim().toUpperCase();
-        const holdingPeriod = document.getElementById('holdingPeriod').value;
+    async runAnalysis() {
+        const stockTicker = document.getElementById('stockTicker').value.trim();
+        const periodValue = document.getElementById('periodValue').value;
+        const periodUnit = document.getElementById('periodUnit').value;
 
-        if (!stockTicker || !holdingPeriod) {
-            this.showError('請填寫所有必填欄位');
-            return;
-        }
+        if (!stockTicker) return;
 
-        this.showLoading();
+        // Show loading state
+        this.resultsSection.classList.add('active');
+        this.loading.style.display = 'block';
+        this.resultsContent.style.display = 'none';
 
-        // Simulate API call delay
-        await this.delay(1500);
+        // Scroll to results
+        this.resultsSection.scrollIntoView({ behavior: 'smooth' });
 
         try {
-            const prediction = this.generatePrediction(stockTicker, holdingPeriod);
-            this.displayResults(prediction);
-            this.renderCharts(prediction);
+            const response = await fetch(`/api/stock/${stockTicker}`);
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || '無法獲取數據');
+            }
+
+            this.currentPrediction = data;
+
+            // Calculate total holding days
+            let holdingDays = periodValue;
+            if (periodUnit === 'weeks') holdingDays *= 7;
+            if (periodUnit === 'months') holdingDays *= 30;
+
+            this.currentPrediction.holdingDays = holdingDays;
+
+            this.updateUI(data);
+            this.renderCharts(data);
+
+            // Hide loading, show content
+            this.loading.style.display = 'none';
+            this.resultsContent.style.display = 'block';
+            document.getElementById('updateInfo').style.display = 'flex';
+
         } catch (error) {
-            this.showError('分析失敗，請稍後再試');
-            console.error(error);
+            alert(error.message);
+            this.resultsSection.classList.remove('active');
+            this.loading.style.display = 'none';
         }
     }
 
-    generatePrediction(ticker, period) {
-        const basePrice = this.getSimulatedPrice(ticker);
-        const params = this.getPeriodParameters(period);
+    updateUI(data) {
+        document.getElementById('resultStockName').textContent = `${data.ticker} 分析結果`;
+        document.getElementById('resultBadge').textContent = data.currency;
 
-        // Calculate basic price targets
-        const volatility = basePrice * params.volatility;
-        const expectedReturn = basePrice * params.expectedReturn;
+        const currentPrice = data.currentPrice;
+        document.getElementById('currentPrice').textContent = formatCurrency(currentPrice);
+        document.getElementById('lastUpdateTime').textContent = data.timestamp;
 
-        const buyPrice = basePrice - (volatility * (0.8 + Math.random() * 0.4));
-        const sellPrice = basePrice + expectedReturn + (volatility * (0.5 + Math.random() * 0.5));
+        // Get dynamic parameters based on holding period
+        const { volatility, expectedReturn, riskLevel } = this.getDynamicParameters(this.currentPrediction.holdingDays);
 
-        // Generate advanced data
-        const technicalData = this.generateTechnicalData(basePrice);
-        const revenueData = this.generateRevenueData();
-        const chipData = this.generateChipData();
-        const timingData = this.generateTimingData(period, technicalData);
+        // Update Stats
+        document.getElementById('riskLevel').textContent = riskLevel;
+        document.getElementById('expectedReturn').textContent = formatPercentage(expectedReturn * 100);
+        document.getElementById('holdingPeriodDisplay').textContent = `${document.getElementById('periodValue').value} ${document.getElementById('periodUnit').options[document.getElementById('periodUnit').selectedIndex].text}`;
 
-        return {
-            ticker,
-            period,
-            currentPrice: basePrice,
-            buyPrice,
-            buyRange: { low: buyPrice * 0.97, high: buyPrice * 1.03 },
-            sellPrice,
-            sellRange: { low: sellPrice * 0.97, high: sellPrice * 1.03 },
-            buyConfidence: 65 + Math.random() * 20,
-            sellConfidence: 60 + Math.random() * 25,
-            expectedReturn: ((sellPrice - buyPrice) / buyPrice * 100).toFixed(2),
-            riskLevel: params.riskLevel,
-            periodDisplay: params.displayName,
-            technical: technicalData,
-            revenue: revenueData,
-            chip: chipData,
-            timing: timingData
-        };
+        // Generate Timing Signals
+        const timing = this.generateTimingData(data.history, currentPrice);
+
+        // Update Buy/Sell Cards
+        const buyPrice = currentPrice * (1 - volatility);
+        const sellPrice = currentPrice * (1 + volatility); // Simple logic for demo
+
+        document.getElementById('buyPrice').textContent = formatCurrency(buyPrice);
+        document.getElementById('buyRange').textContent = `${formatCurrency(buyPrice * 0.98)} - ${formatCurrency(buyPrice * 1.02)}`;
+
+        // Random confidence for demo
+        const buyConf = Math.floor(60 + Math.random() * 30);
+        document.getElementById('buyConfidence').style.width = `${buyConf}%`;
+        document.getElementById('buyConfidenceText').textContent = `信心指數: ${buyConf}%`;
+
+        document.getElementById('sellPrice').textContent = formatCurrency(sellPrice);
+        document.getElementById('sellRange').textContent = `${formatCurrency(sellPrice * 0.98)} - ${formatCurrency(sellPrice * 1.02)}`;
+
+        const sellConf = Math.floor(60 + Math.random() * 30);
+        document.getElementById('sellConfidence').style.width = `${sellConf}%`;
+        document.getElementById('sellConfidenceText').textContent = `信心指數: ${sellConf}%`;
+
+        // Update Timing Meter
+        this.updateTimingDisplay(timing.signal, timing.score);
+        this.recalculateTradePlan(timing.signal);
+
+        // Technical Indicators (Simulated)
+        document.getElementById('rsiValue').textContent = (30 + Math.random() * 40).toFixed(2);
+        document.getElementById('rsiStatus').textContent = Math.random() > 0.5 ? '中立' : '超買';
+        document.getElementById('macdValue').textContent = (Math.random() * 2 - 1).toFixed(2);
+        document.getElementById('macdStatus').textContent = Math.random() > 0.5 ? '黃金交叉' : '死亡交叉';
+        document.getElementById('kdValue').textContent = (20 + Math.random() * 60).toFixed(2);
+        document.getElementById('kdStatus').textContent = '盤整';
+
+        // Revenue YoY/MoM (Simulated)
+        document.getElementById('revenueYoy').textContent = (Math.random() * 20 - 5).toFixed(2) + '%';
+        document.getElementById('revenueMom').textContent = (Math.random() * 10 - 2).toFixed(2) + '%';
+
+        // Chip Stats (from backend)
+        const chips = data.chip;
+        const lastForeign = chips.foreign[chips.foreign.length - 1];
+        const lastTrust = chips.trust[chips.trust.length - 1];
+        const lastDealer = chips.dealer[chips.dealer.length - 1];
+
+        this.setChipValue('foreignBuySell', lastForeign);
+        this.setChipValue('trustBuySell', lastTrust);
+        this.setChipValue('dealerBuySell', lastDealer);
     }
 
-    getSimulatedPrice(ticker) {
-        const priceRanges = {
-            'AAPL': { min: 150, max: 200 },
-            'TSLA': { min: 200, max: 300 },
-            'GOOGL': { min: 120, max: 150 },
-            'MSFT': { min: 350, max: 400 },
-            'AMZN': { min: 140, max: 180 },
-            '2330.TW': { min: 500, max: 650 },
-            '2317.TW': { min: 80, max: 120 },
-            'default': { min: 50, max: 150 }
-        };
-        const range = priceRanges[ticker] || priceRanges['default'];
-        return range.min + Math.random() * (range.max - range.min);
-    }
-
-    getPeriodParameters(period) {
-        const parameters = {
-            'short': { volatility: 0.03, expectedReturn: 0.05, riskLevel: '高風險', displayName: '短期 (1-7天)' },
-            'medium': { volatility: 0.05, expectedReturn: 0.12, riskLevel: '中等風險', displayName: '中期 (1-3個月)' },
-            'long': { volatility: 0.08, expectedReturn: 0.25, riskLevel: '低風險', displayName: '長期 (6個月以上)' }
-        };
-        return parameters[period] || parameters['medium'];
-    }
-
-    generateTechnicalData(currentPrice) {
-        const history = [];
-        let price = currentPrice * 0.85;
-        for (let i = 0; i < 60; i++) {
-            price = price * (1 + (Math.random() - 0.45) * 0.05);
-            history.push(price);
-        }
-        // Ensure last price matches current
-        history[history.length - 1] = currentPrice;
-
-        return {
-            history,
-            rsi: 30 + Math.random() * 40,
-            macd: (Math.random() - 0.5) * 2,
-            k: 20 + Math.random() * 60,
-            d: 20 + Math.random() * 60
-        };
-    }
-
-    generateRevenueData() {
-        const monthly = [];
-        for (let i = 0; i < 12; i++) {
-            monthly.push(100 + Math.random() * 50 + i * 2);
-        }
-        return {
-            monthly,
-            yoy: (Math.random() * 20 - 5).toFixed(2),
-            mom: (Math.random() * 10 - 2).toFixed(2)
-        };
-    }
-
-    generateChipData() {
-        const foreign = [];
-        const trust = [];
-        const dealer = [];
-        for (let i = 0; i < 10; i++) {
-            foreign.push(Math.floor((Math.random() - 0.5) * 1000));
-            trust.push(Math.floor((Math.random() - 0.5) * 500));
-            dealer.push(Math.floor((Math.random() - 0.5) * 200));
-        }
-        return { foreign, trust, dealer };
-    }
-
-    generateTimingData(period, technical) {
-        const score = Math.random() * 100;
-        let signal, entry, exit, stop;
-
-        if (score > 80) signal = '強力買入';
-        else if (score > 60) signal = '買入';
-        else if (score > 40) signal = '持有';
-        else if (score > 20) signal = '賣出';
-        else signal = '強力賣出';
-
-        const current = technical.history[technical.history.length - 1];
-        entry = (current * 0.98).toFixed(2);
-        exit = (current * 1.1).toFixed(2);
-        stop = (current * 0.95).toFixed(2);
-
-        return { score, signal, entry, exit, stop };
-    }
-
-    displayResults(prediction) {
-        // Basic Info
-        document.getElementById('resultStockName').textContent = `${prediction.ticker} 分析結果`;
-        document.getElementById('resultBadge').textContent = prediction.periodDisplay;
-
-        // Price Cards
-        document.getElementById('buyPrice').textContent = formatCurrency(prediction.buyPrice);
-        document.getElementById('buyRange').textContent = `${formatCurrency(prediction.buyRange.low)} - ${formatCurrency(prediction.buyRange.high)}`;
-        document.getElementById('buyConfidence').style.width = `${prediction.buyConfidence}%`;
-        document.getElementById('buyConfidenceText').textContent = `信心指數: ${prediction.buyConfidence.toFixed(0)}%`;
-
-        document.getElementById('sellPrice').textContent = formatCurrency(prediction.sellPrice);
-        document.getElementById('sellRange').textContent = `${formatCurrency(prediction.sellRange.low)} - ${formatCurrency(prediction.sellRange.high)}`;
-        document.getElementById('sellConfidence').style.width = `${prediction.sellConfidence}%`;
-        document.getElementById('sellConfidenceText').textContent = `信心指數: ${prediction.sellConfidence.toFixed(0)}%`;
-
-        // Timing Analysis
-        const arrowPos = prediction.timing.score;
-        document.getElementById('signalArrow').style.left = `${arrowPos}%`;
-        document.getElementById('overallSignal').textContent = prediction.timing.signal;
-        document.getElementById('overallSignal').style.color = this.getSignalColor(prediction.timing.signal);
-        document.getElementById('entryPoint').textContent = formatCurrency(parseFloat(prediction.timing.entry));
-        document.getElementById('exitPoint').textContent = formatCurrency(parseFloat(prediction.timing.exit));
-        document.getElementById('stopLoss').textContent = formatCurrency(parseFloat(prediction.timing.stop));
-
-        // Technical Indicators
-        this.updateIndicator('rsi', prediction.technical.rsi, 30, 70);
-        this.updateIndicator('macd', prediction.technical.macd, 0, 0);
-        this.updateIndicator('kd', prediction.technical.k, 20, 80);
-
-        // Revenue & Chip Stats
-        document.getElementById('revenueYoy').textContent = formatPercentage(parseFloat(prediction.revenue.yoy));
-        document.getElementById('revenueYoy').className = `value ${parseFloat(prediction.revenue.yoy) >= 0 ? 'text-success' : 'text-danger'}`;
-        document.getElementById('revenueMom').textContent = formatPercentage(parseFloat(prediction.revenue.mom));
-
-        const sum = arr => arr.reduce((a, b) => a + b, 0);
-        this.updateChipStat('foreignBuySell', sum(prediction.chip.foreign));
-        this.updateChipStat('trustBuySell', sum(prediction.chip.trust));
-        this.updateChipStat('dealerBuySell', sum(prediction.chip.dealer));
-
-        // Detailed Stats
-        document.getElementById('currentPrice').textContent = formatCurrency(prediction.currentPrice);
-        document.getElementById('expectedReturn').textContent = `${prediction.expectedReturn}%`;
-        document.getElementById('riskLevel').textContent = prediction.riskLevel;
-        document.getElementById('holdingPeriodDisplay').textContent = prediction.periodDisplay;
-
-        // Show Results
-        this.hideLoading();
-        this.resultsContent.classList.add('active');
-
-        setTimeout(() => this.animateConfidenceBars(), 100);
-    }
-
-    updateIndicator(id, value, low, high) {
-        const elValue = document.getElementById(`${id}Value`);
-        const elStatus = document.getElementById(`${id}Status`);
-
-        elValue.textContent = value.toFixed(2);
-
-        let status, color;
-        if (id === 'macd') {
-            status = value > 0 ? '多頭' : '空頭';
-            color = value > 0 ? '#00f2fe' : '#fa709a';
-        } else {
-            if (value > high) { status = '超買'; color = '#fa709a'; }
-            else if (value < low) { status = '超賣'; color = '#00f2fe'; }
-            else { status = '中立'; color = '#b4b4c8'; }
-        }
-
-        elStatus.textContent = status;
-        elStatus.style.backgroundColor = `${color}33`; // 20% opacity
-        elStatus.style.color = color;
-    }
-
-    updateChipStat(id, value) {
+    setChipValue(id, value) {
         const el = document.getElementById(id);
         el.textContent = value > 0 ? `+${value}` : value;
-        el.style.color = value > 0 ? '#00f2fe' : '#fa709a';
+        el.style.color = value > 0 ? '#ff4d4d' : (value < 0 ? '#00cc44' : '#b4b4c8');
     }
 
-    getSignalColor(signal) {
-        if (signal.includes('買入')) return '#00f2fe';
-        if (signal.includes('賣出')) return '#fa709a';
-        return '#b4b4c8';
-    }
+    renderCharts(data) {
+        // Destroy existing charts if any
+        if (this.technicalChart) this.technicalChart.destroy();
+        if (this.revenueChart) this.revenueChart.destroy();
+        if (this.chipChart) this.chipChart.destroy();
 
-    renderCharts(prediction) {
-        this.destroyCharts();
+        const labels = Array.from({ length: data.history.length }, (_, i) => i + 1);
 
-        // Technical Chart
+        // 1. Technical Chart
         const ctxTech = document.getElementById('technicalChart').getContext('2d');
         this.technicalChart = new Chart(ctxTech, {
             type: 'line',
             data: {
-                labels: Array.from({ length: 60 }, (_, i) => i + 1),
+                labels: labels,
                 datasets: [{
                     label: '股價走勢',
-                    data: prediction.technical.history,
+                    data: data.history,
                     borderColor: '#667eea',
                     backgroundColor: 'rgba(102, 126, 234, 0.1)',
                     fill: true,
@@ -277,117 +193,189 @@ class StockPredictor {
             },
             options: {
                 responsive: true,
-                maintainAspectRatio: false,
                 plugins: { legend: { display: false } },
                 scales: {
                     x: { display: false },
-                    y: { grid: { color: 'rgba(255, 255, 255, 0.05)' } }
+                    y: { grid: { color: 'rgba(255,255,255,0.05)' } }
                 }
             }
         });
 
-        // Revenue Chart
+        // 2. Revenue Chart (Simulated)
         const ctxRev = document.getElementById('revenueChart').getContext('2d');
+        const revenueData = Array.from({ length: 6 }, () => Math.floor(Math.random() * 5000 + 1000));
         this.revenueChart = new Chart(ctxRev, {
             type: 'bar',
             data: {
-                labels: ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'],
+                labels: ['1月', '2月', '3月', '4月', '5月', '6月'],
                 datasets: [{
-                    label: '月營收 (億)',
-                    data: prediction.revenue.monthly,
-                    backgroundColor: '#4facfe',
+                    label: '月營收',
+                    data: revenueData,
+                    backgroundColor: '#764ba2',
                     borderRadius: 4
                 }]
             },
             options: {
                 responsive: true,
-                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
                 scales: {
-                    y: { grid: { color: 'rgba(255, 255, 255, 0.05)' } },
-                    x: { grid: { display: false } }
+                    x: { grid: { display: false } },
+                    y: { display: false }
                 }
             }
         });
 
-        // Chip Chart
+        // 3. Chip Chart (Foreign/Trust/Dealer)
         const ctxChip = document.getElementById('chipChart').getContext('2d');
         this.chipChart = new Chart(ctxChip, {
             type: 'bar',
             data: {
-                labels: Array.from({ length: 10 }, (_, i) => `T-${9 - i}`),
+                labels: Array.from({ length: 10 }, (_, i) => `D-${10 - i}`),
                 datasets: [
-                    { label: '外資', data: prediction.chip.foreign, backgroundColor: '#f093fb' },
-                    { label: '投信', data: prediction.chip.trust, backgroundColor: '#4facfe' },
-                    { label: '自營商', data: prediction.chip.dealer, backgroundColor: '#fa709a' }
+                    { label: '外資', data: data.chip.foreign, backgroundColor: '#ff4d4d' },
+                    { label: '投信', data: data.chip.trust, backgroundColor: '#faa04d' },
+                    { label: '自營商', data: data.chip.dealer, backgroundColor: '#00cc44' }
                 ]
             },
             options: {
                 responsive: true,
-                maintainAspectRatio: false,
                 scales: {
-                    x: { stacked: true, grid: { display: false } },
-                    y: { stacked: true, grid: { color: 'rgba(255, 255, 255, 0.05)' } }
-                }
+                    x: { stacked: true, display: false },
+                    y: { stacked: true, display: false }
+                },
+                plugins: { legend: { display: true, position: 'bottom' } }
             }
         });
     }
 
-    destroyCharts() {
-        if (this.technicalChart) this.technicalChart.destroy();
-        if (this.revenueChart) this.revenueChart.destroy();
-        if (this.chipChart) this.chipChart.destroy();
+    async handleRefresh() {
+        if (this.currentPrediction) {
+            await this.runAnalysis();
+        }
     }
 
-    animateConfidenceBars() {
-        const buyBar = document.getElementById('buyConfidence');
-        const sellBar = document.getElementById('sellConfidence');
-        const buyWidth = buyBar.style.width;
-        const sellWidth = sellBar.style.width;
-        buyBar.style.width = '0%';
-        sellBar.style.width = '0%';
-        setTimeout(() => {
-            buyBar.style.width = buyWidth;
-            sellBar.style.width = sellWidth;
-        }, 50);
+    /* ================= 工具方法 ================= */
+
+    getDynamicParameters(days) {
+        let volatility, expectedReturn, riskLevel;
+
+        // Ultra-conservative settings to ensure prices are "buyable" (close to market)
+        if (days <= 7) {
+            volatility = 0.005; // 0.5% range (Very tight)
+            expectedReturn = 0.01;
+            riskLevel = '高風險 (短期)';
+        } else if (days <= 90) {
+            volatility = 0.01 + (days / 90) * 0.005; // ~1-1.5% range
+            expectedReturn = 0.03 + (days / 90) * 0.02;
+            riskLevel = '中等風險';
+        } else {
+            volatility = 0.02 + (days / 365) * 0.01; // Max ~3% range
+            expectedReturn = 0.06 + (days / 365) * 0.04;
+            riskLevel = '低風險 (長期)';
+        }
+
+        return { volatility, expectedReturn, riskLevel };
     }
 
-    showLoading() {
-        this.resultsSection.classList.add('active');
-        this.loading.style.display = 'block';
-        this.resultsContent.classList.remove('active');
-        this.resultsSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    generateTimingData(technical, currentPrice) {
+        const score = Math.random() * 100;
+        let signal;
+
+        if (score > 80) signal = '強力買入';
+        else if (score > 60) signal = '買入';
+        else if (score > 40) signal = '持有';
+        else if (score > 20) signal = '賣出';
+        else signal = '強力賣出';
+
+        const plan = this.calculateTradePlan(signal, currentPrice);
+        return { score, signal, ...plan };
     }
 
-    hideLoading() {
-        this.loading.style.display = 'none';
+    calculateTradePlan(signal, price) {
+        let entry, exit, stop;
+
+        // Extremely tight spreads to ensure "Buyable" prices
+        switch (signal) {
+            case '強力買入':
+                entry = price * 1.00;      // Buy at Current
+                stop = price * 0.98;       // 2% stop
+                exit = price * 1.05;       // 5% target
+                break;
+            case '買入':
+                entry = price * 0.995;     // Buy 0.5% dip
+                stop = price * 0.97;
+                exit = price * 1.04;
+                break;
+            case '持有':
+                entry = price * 0.99;      // Buy 1% dip
+                stop = price * 0.96;
+                exit = price * 1.02;
+                break;
+            case '賣出':
+                entry = price * 0.98;      // Wait for 2% dip
+                stop = price * 0.95;
+                exit = price * 1.01;
+                break;
+            case '強力賣出':
+                entry = price * 0.96;      // Wait for 4% dip
+                stop = price * 0.93;
+                exit = price * 1.00;
+                break;
+        }
+
+        return {
+            entry: entry.toFixed(2),
+            exit: exit.toFixed(2),
+            stop: stop.toFixed(2)
+        };
     }
 
-    showError(message) {
-        alert(message);
-        this.resultsSection.classList.remove('active');
+    recalculateTradePlan(signal) {
+        const price = this.currentPrediction.currentPrice;
+        const plan = this.calculateTradePlan(signal, price);
+
+        document.getElementById('entryPoint').textContent = formatCurrency(+plan.entry);
+        document.getElementById('exitPoint').textContent = formatCurrency(+plan.exit);
+        document.getElementById('stopLoss').textContent = formatCurrency(+plan.stop);
+
+        document.getElementById('overallSignal').textContent = signal;
+        document.getElementById('overallSignal').style.color = this.getSignalColor(signal);
     }
 
-    delay(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
+    updateTimingDisplay(signal, score) {
+        document.getElementById('signalArrow').style.left = `${score}%`;
+        document.getElementById('overallSignal').textContent = signal;
+        document.getElementById('overallSignal').style.color = this.getSignalColor(signal);
+    }
+
+    getSignalColor(signal) {
+        if (signal.includes('買入')) return '#00f2fe';
+        if (signal.includes('賣出')) return '#fa709a';
+        return '#b4b4c8';
     }
 }
 
+/* ================== DOM Ready ================== */
+
 document.addEventListener('DOMContentLoaded', () => {
     new StockPredictor();
+
     const stockInput = document.getElementById('stockTicker');
     stockInput.addEventListener('input', (e) => {
         e.target.value = e.target.value.toUpperCase();
     });
-    const cards = document.querySelectorAll('.glass-card');
-    cards.forEach((card, index) => {
-        card.style.animationDelay = `${index * 0.1}s`;
+
+    document.querySelectorAll('.glass-card').forEach((card, i) => {
+        card.style.animationDelay = `${i * 0.1}s`;
     });
 });
+
+/* ================== Helpers ================== */
 
 function formatCurrency(value, decimals = 2) {
     return `$${value.toFixed(decimals)}`;
 }
 
-function formatPercentage(value, decimals = 2) {
+function formatPercentage(value) {
     return `${value}%`;
 }
