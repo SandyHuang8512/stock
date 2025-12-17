@@ -1,9 +1,13 @@
 from flask import Flask, jsonify, send_from_directory, request
-import yfinance as yf
 import requests
 import os
 import random
 from datetime import datetime
+
+# Vercel (and other serverless platforms) use a read-only filesystem, 
+# but allow writing to /tmp. We must tell yfinance to use /tmp for caching.
+os.environ['YFINANCE_CACHE_DIR'] = "/tmp/yfinance"
+import yfinance as yf
 
 app = Flask(__name__, static_folder='.')
 
