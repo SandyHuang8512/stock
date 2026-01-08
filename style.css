@@ -812,3 +812,83 @@ body {
         flex-direction: column;
     }
 }
+
+/* ==================== Chip Analysis - Holdings Circles ==================== */
+.holdings-container {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    padding: 20px 0;
+}
+
+.holding-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+}
+
+.holding-label {
+    font-size: 1rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.holding-circle-wrapper {
+    position: relative;
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.05); /* Track color */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.holding-circle {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    /* background set dynamically via JS */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    transform: rotate(-90deg); /* Start from top */
+    transition: background 1s ease-out;
+}
+
+/* Inner masking circle to create ring effect */
+.holding-circle::before {
+    content: '';
+    position: absolute;
+    width: 85%;
+    height: 85%;
+    background: #1a1a2e; /* Match card bg approximate (need solid for mask) */
+    background: var(--card-bg); /* Use var if solid, if glass it might look weird. */
+    /* Since card-bg is glass (rgba), mixing might be issue. Let's use darker solid fallback or semi-trans */
+    background: #16213e; /* Fallback dark */
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0)); /* Glass override? No. */
+    /* Best to use a dark color that blends */
+    background: #1e1e2f; 
+    border-radius: 50%;
+}
+
+/* Adjust circle text rotation back */
+.circle-val {
+    position: relative;
+    z-index: 2;
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    transform: rotate(90deg); /* Counteract parent rotation */
+}
+
+.chip-note {
+    text-align: center;
+    margin-top: 15px;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    opacity: 0.8;
+}

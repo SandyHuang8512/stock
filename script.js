@@ -11,7 +11,7 @@ class StockPredictor {
         // Chart instances
         this.technicalChart = null;
         this.revenueChart = null;
-        this.chipChart = null;
+
 
         // State
         this.currentPrediction = null;
@@ -66,7 +66,8 @@ class StockPredictor {
         this.resultsSection.scrollIntoView({ behavior: 'smooth' });
 
         try {
-            const response = await fetch(`/api/stock/${stockTicker}`);
+            const API_BASE_URL = window.location.protocol === 'file:' ? 'http://localhost:5000' : '';
+            const response = await fetch(`${API_BASE_URL}/api/stock/${stockTicker}`);
             const data = await response.json();
 
             if (!response.ok) {
@@ -102,8 +103,11 @@ class StockPredictor {
         document.getElementById('resultBadge').textContent = data.currency;
 
         const currentPrice = data.currentPrice;
-        document.getElementById('currentPrice').textContent = formatCurrency(currentPrice);
-        document.getElementById('lastUpdateTime').textContent = data.timestamp;
+        document.getElementById('currentPrice').textContent = formatCurrency(data.currentPrice);
+
+        // Prefer showing the actual Data Time (Regular Market Time)
+        const displayTime = data.price_time || data.timestamp;
+        document.getElementById('lastUpdateTime').textContent = displayTime;
 
         // Get dynamic parameters based on holding period
         const { volatility, expectedReturn, riskLevel } = this.getDynamicParameters(this.currentPrediction.holdingDays);
@@ -147,32 +151,52 @@ class StockPredictor {
         document.getElementById('kdValue').textContent = (20 + Math.random() * 60).toFixed(2);
         document.getElementById('kdStatus').textContent = '盤整';
 
-        // Revenue YoY/MoM (Simulated)
-        document.getElementById('revenueYoy').textContent = (Math.random() * 20 - 5).toFixed(2) + '%';
-        document.getElementById('revenueMom').textContent = (Math.random() * 10 - 2).toFixed(2) + '%';
+        // Revenue YoY/QoQ (Calculated from Real Data)
+        const revData = data.revenue || [];
+        if (revData.length >= 2) {
+            // Compare last with same Q last year (approx index -4)
+            // But this is list of varying length. Simple YoY: last vs last-4
+            // Simple QoQ: last vs last-1
+            const currentRev = revData[revData.length - 1].value;
+            const prevQRev = revData[revData.length - 2].value;
+            // YoY needs 4 quarters back ideally, if not available, show N/A
+            const prevYearRev = revData.length >= 5 ? revData[revData.length - 5].value : null;
 
-        // Chip Stats (from backend)
-        const chips = data.chip;
-        const lastForeign = chips.foreign[chips.foreign.length - 1];
-        const lastTrust = chips.trust[chips.trust.length - 1];
-        const lastDealer = chips.dealer[chips.dealer.length - 1];
+            const qoq = ((currentRev - prevQRev) / prevQRev) * 100;
+            document.getElementById('revenueMom').textContent = qoq.toFixed(2) + '%';
 
-        this.setChipValue('foreignBuySell', lastForeign);
-        this.setChipValue('trustBuySell', lastTrust);
-        this.setChipValue('dealerBuySell', lastDealer);
+            if (prevYearRev) {
+                const yoy = ((currentRev - prevYearRev) / prevYearRev) * 100;
+                document.getElementById('revenueYoy').textContent = yoy.toFixed(2) + '%';
+            } else {
+                document.getElementById('revenueYoy').textContent = 'N/A';
+            }
+        } else {
+            document.getElementById('revenueMom').textContent = '-';
+            document.getElementById('revenueYoy').textContent = '-';
+        }
+
+        // Real Chip Stats (Holdings)
+        const holdings = data.holdings;
+        this.updateHoldings('institutionVal', 'institutionCircle', holdings.institutions);
+        this.updateHoldings('insiderVal', 'insiderCircle', holdings.insiders);
     }
 
-    setChipValue(id, value) {
-        const el = document.getElementById(id);
-        el.textContent = value > 0 ? `+${value}` : value;
-        el.style.color = value > 0 ? '#ff4d4d' : (value < 0 ? '#00cc44' : '#b4b4c8');
+    updateHoldings(textId, circleId, val) {
+        // val is 0 to 1 (e.g. 0.42)
+        const pct = (val * 100).toFixed(2);
+        document.getElementById(textId).textContent = pct + '%';
+
+        // Visual circle fill (conic gradient)
+        const deg = val * 360;
+        document.getElementById(circleId).style.background = `conic-gradient(#667eea ${deg}deg, rgba(255,255,255,0.1) 0deg)`;
     }
 
     renderCharts(data) {
         // Destroy existing charts if any
         if (this.technicalChart) this.technicalChart.destroy();
         if (this.revenueChart) this.revenueChart.destroy();
-        if (this.chipChart) this.chipChart.destroy();
+
 
         const labels = Array.from({ length: data.history.length }, (_, i) => i + 1);
 
@@ -201,16 +225,19 @@ class StockPredictor {
             }
         });
 
-        // 2. Revenue Chart (Simulated)
+        // 2. Revenue Chart (Real Quarterly Data)
         const ctxRev = document.getElementById('revenueChart').getContext('2d');
-        const revenueData = Array.from({ length: 6 }, () => Math.floor(Math.random() * 5000 + 1000));
+        const revData = data.revenue || [];
+        // Take last 6 quarters max
+        const recentRev = revData.slice(-6);
+
         this.revenueChart = new Chart(ctxRev, {
             type: 'bar',
             data: {
-                labels: ['1月', '2月', '3月', '4月', '5月', '6月'],
+                labels: recentRev.map(d => d.date_full),
                 datasets: [{
-                    label: '月營收',
-                    data: revenueData,
+                    label: '季營收',
+                    data: recentRev.map(d => d.value),
                     backgroundColor: '#764ba2',
                     borderRadius: 4
                 }]
@@ -220,32 +247,12 @@ class StockPredictor {
                 plugins: { legend: { display: false } },
                 scales: {
                     x: { grid: { display: false } },
-                    y: { display: false }
+                    y: { display: false } // Hide Y axis for clean look
                 }
             }
         });
 
-        // 3. Chip Chart (Foreign/Trust/Dealer)
-        const ctxChip = document.getElementById('chipChart').getContext('2d');
-        this.chipChart = new Chart(ctxChip, {
-            type: 'bar',
-            data: {
-                labels: Array.from({ length: 10 }, (_, i) => `D-${10 - i}`),
-                datasets: [
-                    { label: '外資', data: data.chip.foreign, backgroundColor: '#ff4d4d' },
-                    { label: '投信', data: data.chip.trust, backgroundColor: '#faa04d' },
-                    { label: '自營商', data: data.chip.dealer, backgroundColor: '#00cc44' }
-                ]
-            },
-            options: {
-                responsive: true,
-                scales: {
-                    x: { stacked: true, display: false },
-                    y: { stacked: true, display: false }
-                },
-                plugins: { legend: { display: true, position: 'bottom' } }
-            }
-        });
+
     }
 
     async handleRefresh() {

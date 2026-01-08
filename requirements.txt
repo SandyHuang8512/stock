@@ -3,3 +3,4 @@ yfinance>=0.2.66
 gunicorn
 requests
 lxml
+flask-cors

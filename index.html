@@ -48,7 +48,7 @@
                             <span class="input-icon">📊</span>
                         </div>
                         <div class="update-info" id="updateInfo" style="display: none;">
-                            <span class="update-time">最後更新: <span id="lastUpdateTime">-</span></span>
+                            <span class="update-time">最後更新: <span id="lastUpdateTime">-</span> (延遲報價 > 15分)</span>
                             <button type="button" class="refresh-btn" id="refreshBtn" title="更新報價">↻</button>
                         </div>
                         <small class="input-hint">請輸入有效的股票代碼</small>
@@ -188,11 +188,11 @@
                         </div>
                         <div class="revenue-stats">
                             <div class="stat-item">
-                                <span class="label">月營收年增率 (YoY)</span>
+                                <span class="label">季營收年增率 (YoY)</span>
                                 <span class="value" id="revenueYoy">-</span>
                             </div>
                             <div class="stat-item">
-                                <span class="label">月營收月增率 (MoM)</span>
+                                <span class="label">季營收季增率 (QoQ)</span>
                                 <span class="value" id="revenueMom">-</span>
                             </div>
                         </div>
@@ -201,22 +201,27 @@
                     <!-- Chip Analysis Section -->
                     <div class="analysis-section glass-card">
                         <h3>籌碼分析</h3>
-                        <div class="chart-container">
-                            <canvas id="chipChart"></canvas>
+                        <h3>籌碼結構 (機構/內部人持股)</h3>
+                        <div class="holdings-container">
+                            <div class="holding-stat">
+                                <span class="holding-label">機構持股</span>
+                                <div class="holding-circle-wrapper">
+                                    <div class="holding-circle" id="institutionCircle">
+                                        <span class="circle-val" id="institutionVal">0%</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="holding-stat">
+                                <span class="holding-label">內部人持股</span>
+                                <div class="holding-circle-wrapper">
+                                    <div class="holding-circle" id="insiderCircle">
+                                        <span class="circle-val" id="insiderVal">0%</span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div class="chip-stats">
-                            <div class="stat-item">
-                                <span class="label">外資買賣超</span>
-                                <span class="value" id="foreignBuySell">-</span>
-                            </div>
-                            <div class="stat-item">
-                                <span class="label">投信買賣超</span>
-                                <span class="value" id="trustBuySell">-</span>
-                            </div>
-                            <div class="stat-item">
-                                <span class="label">自營商買賣超</span>
-                                <span class="value" id="dealerBuySell">-</span>
-                            </div>
+                        <div class="chip-note">
+                            <small>* 註：目前資料源僅提供總持股比例，無每日買賣超明細</small>
                         </div>
                     </div>
 
